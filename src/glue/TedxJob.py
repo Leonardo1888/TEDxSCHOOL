@@ -214,7 +214,7 @@ tedx_dataset_agg.printSchema()
 
 
 write_mongo_options = {
-"connectionName": "TEDX",
+"connectionName": "Mongodbatlas connection TEDxSchool",
 "database": "unibg_tedx_2025",
 "collection": "tedx_data",
 "ssl": "true",
