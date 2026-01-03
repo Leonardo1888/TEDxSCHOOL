@@ -218,22 +218,38 @@ classrooms_df = random_ids_df.withColumn("id_classroom", row_number().over(windo
 
 classrooms_final = classrooms_df.select("id_classroom", col("idtedx").alias("assigned_tedx"))
 
-# =========================================================================
-# === FASE 6: SCRITTURA CLASSROOMS SU MONGODB ===
 
-write_classrooms_options = {
+# =========================================================================
+# === FASE 6: SCRITTURA DOPPIA SU MONGODB ===
+
+write_mongo_options = {
     "connectionName": "Mongodbatlas connection TEDxSchool",
-    "database": "unibg_tedx_2025", 
-    "collection": "classrooms",
+    "database": "unibg_tedx_2025",
     "ssl": "true",
     "ssl.domain_match": "false"
 }
+
+# SCRIVI TEDX_DATA
+tedx_dynamic_frame = DynamicFrame.fromDF(tedx_dataset_final, glueContext, "tedx_final")
+glueContext.write_dynamic_frame.from_options(
+    tedx_dynamic_frame, 
+    connection_type="mongodb", 
+    connection_options={**write_mongo_options, "collection": "tedx_data"}
+)
+
+# SCRIVI CLASSROOMS
+classrooms_dynamic_frame = DynamicFrame.fromDF(classrooms_final, glueContext, "classrooms")
+glueContext.write_dynamic_frame.from_options(
+    classrooms_dynamic_frame, 
+    connection_type="mongodb", 
+    connection_options={**write_mongo_options, "collection": "classrooms"}
+)
 
 from awsglue.dynamicframe import DynamicFrame
 classrooms_dynamic_frame = DynamicFrame.fromDF(classrooms_final, glueContext, "classrooms")
 glueContext.write_dynamic_frame.from_options(classrooms_dynamic_frame, connection_type="mongodb", connection_options=write_classrooms_options)
 
-print("Classrooms scritte su MongoDB (unibg_tedx_2025.classrooms)")
+print("Scrittura su MongoDB eseguita")
 
 print("#### FINE PROCESSO ETL TEDX - Dati scritti su MongoDB Atlas ####")
 job.commit()
