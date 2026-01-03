@@ -53,7 +53,7 @@ col("id").alias("correct_id")
 # =========================================================================
 # === FASE 2: PULIZIA E JOIN DETTAGLI (details.csv) ===
 
-## READ THE DETAILS E APPLICA LA PULIZIA
+## Legge detais.csv e pulisce i dati
 details_dataset_path = S3_BASE_PATH + "details.csv"
 details_dataset = spark.read \
 .option("header","true") \
@@ -69,11 +69,11 @@ count_newline = details_with_newline.count()
 print(f"WARNING: Trovate {count_newline} righe in details.csv che richiedono pulizia (contengono '\\n').")
 
 if count_newline > 0:
-print("LOG: Prime 5 righe PRIMA della pulizia (per verificare lo shift di colonne):")
-details_with_newline.select("id", "description", "duration", "publishedAt").show(5, truncate=False)
+  print("LOG: Prime 5 righe PRIMA della pulizia (per verificare lo shift di colonne):")
+  details_with_newline.select("id", "description", "duration", "publishedAt").show(5, truncate=False)
 # ---------------------------
 
-# CLEANING PHASE: Rimuove i caratteri di interruzione di riga e normalizza gli spazi
+# Rimuove i caratteri di interruzione di riga e normalizza gli spazi
 details_dataset = details_dataset.withColumn(
 "description",
 regexp_replace(col("description"), "[\\n\\r\\t]", " ")
@@ -87,13 +87,12 @@ trim(col("description"))
 
 # --- LOGGING POST-PULIZIA ---
 if count_newline > 0:
-# Filtra il dataset pulito solo sugli ID che erano problematici per la verifica
-ids_to_check = details_with_newline.select("id").rdd.flatMap(lambda x: x).collect()
-details_cleaned_check = details_dataset.filter(col("id").isin(ids_to_check))
+  # Filtra il dataset pulito solo sugli ID che erano problematici per la verifica
+  ids_to_check = details_with_newline.select("id").rdd.flatMap(lambda x: x).collect()
+  details_cleaned_check = details_dataset.filter(col("id").isin(ids_to_check))
 
 print("LOG: Le stesse 5 righe DOPO la pulizia (duration e publishedAt dovrebbero essere popolati):")
 details_cleaned_check.select("id", "description", "duration", "publishedAt").show(5, truncate=False)
-# ----------------------------
 
 details_dataset = details_dataset.select(col("id").alias("id_ref"),
 col("description"),
@@ -110,11 +109,11 @@ print(f"INFO: Completata la join con details.csv pulito. Totale record: {tedx_da
 # =========================================================================
 # === FASE 3: AGGREGAZIONE E JOIN TAGS (tags.csv) ===
 
-## READ TAGS DATASET
+## Legge TAGS DATASET
 tags_dataset_path = S3_BASE_PATH + "tags.csv"
 tags_dataset = spark.read.option("header","true").csv(tags_dataset_path)
 
-# CREATE THE AGGREGATE MODEL, ADD TAGS TO TEDX_DATASET
+# Aggiunge TAGS a TEDX_DATASET
 tags_dataset_agg = tags_dataset.groupBy(col("id").alias("id_ref")).agg(collect_list("tag").alias("tags"))
 
 # JOIN CON I TAG
@@ -131,8 +130,7 @@ related_videos_dataset = spark.read.option("header","true").csv(related_videos_d
 
 total_suggestions = related_videos_dataset.count()
 
-# ========================================================
-# === 🚀 ANALISI QUALITÀ RELATED_VIDEOS ===
+# === ANALISI QUALITÀ RELATED_VIDEOS ===
 print("\n=== ANALISI QUALITÀ RELATED_VIDEOS ===")
 
 # 1. Crea set di ID e Slug VALIDi
@@ -157,25 +155,23 @@ print("═" * 50)
 # 4. DECISIONE AUTOMATICA
 USE_SLUG_ONLY = slug_validi_pct > 85
 if USE_SLUG_ONLY:
-print("Slug quality OK → Procedo con strategia SLUG ONLY")
+  print("Slug quality OK → Procedo con strategia SLUG ONLY")
 else:
-print(" Slug quality bassa → CONSIDERARE fallback ID+Slug")
-print("═" * 50)
-# ========================================================
+  print(" Slug quality bassa → CONSIDERARE fallback ID+Slug")
+  print("═" * 50)
 
 # RISOLUZIONE: Joina related_videos con la mappa di lookup (slug_id_map_df) usando lo SLUG.
-# L'INNER JOIN garantisce che vengano inclusi solo i video correlati con un SLUG valido.
+# L'INNER JOIN garantisce che vengano inclusi solo i video correlati con uno SLUG valido.
 resolved_videos_df = related_videos_dataset.join(
-slug_id_map_df,
-related_videos_dataset.slug == slug_id_map_df.slug_lookup,
-"inner"
-).select(
-# ID del talk principale (che riceve il suggerimento)
-col("id").alias("main_talk_id"),
-
-# ID CORRETTO del talk suggerito - PRENDIAMO correct_id DALLA MAPPA
-col("correct_id").alias("target_video_id")
-)
+  slug_id_map_df,
+  related_videos_dataset.slug == slug_id_map_df.slug_lookup,
+  "inner"
+  ).select(
+  # ID del talk principale (che riceve il suggerimento)
+  col("id").alias("main_talk_id"),
+  # ID CORRETTO del talk suggerito - PRENDIAMO correct_id DALLA MAPPA
+  col("correct_id").alias("target_video_id")
+  )
 
 valid_suggestions = resolved_videos_df.count()
 discarded_suggestions = total_suggestions - valid_suggestions
@@ -183,8 +179,8 @@ discarded_suggestions = total_suggestions - valid_suggestions
 # --- LOGGING FILTRO ---
 print(f"INFO: In related_videos.csv, c'erano {total_suggestions} suggerimenti totali.")
 if discarded_suggestions > 0:
-print(f"WARNING: Scartati {discarded_suggestions} suggerimenti (ID o Slug non trovati in final_list.csv) tramite INNER JOIN.")
-print(f"INFO: Mantenuti {valid_suggestions} suggerimenti validi con ID risolto.")
+  print(f"WARNING: Scartati {discarded_suggestions} suggerimenti (ID o Slug non trovati in final_list.csv) tramite INNER JOIN.")
+  print(f"INFO: Mantenuti {valid_suggestions} suggerimenti validi con ID risolto.")
 # ----------------------
 
 # AGGREGAZIONE: Raggruppa per 'main_talk_id' e colleziona tutti i 'target_video_id' in un array
