@@ -197,28 +197,43 @@ tedx_dataset_agg.id == related_videos_agg.main_talk_id,
 .drop("main_talk_id") # Rimuoviamo la colonna duplicata usata per la join
 
 
+
 # =========================================================================
-# === FASE 5: SCRITTURA SU MONGODB ATLAS ===
+# === FASE 5: CREAZIONE CLASSROOMS ===
 
-# PROIEZIONE FINALE (select) E RILEGATURA CHIAVE MONGO
-tedx_dataset_agg = tedx_dataset_agg \
-.select(col("id").alias("_id"), col("*")) \
-.drop("id")
+from pyspark.sql.functions import rand, row_number, col
+from pyspark.sql.window import Window
 
-print(f"INFO: Schema del DataFrame finale prima della scrittura su MongoDB:")
-tedx_dataset_agg.printSchema()
+NUM_CLASSI = 10
+VIDEOS_PER_CLASSE = 3
+total_videos = NUM_CLASSI * VIDEOS_PER_CLASSE
 
+# randomizzazione
+tedx_ids = tedx_dataset_agg.select(col("_id").alias("idtedx"))
+random_ids_df = tedx_ids.orderBy(rand()).limit(total_videos)
 
-write_mongo_options = {
-"connectionName": "Mongodbatlas connection TEDxSchool",
-"database": "unibg_tedx_2025",
-"collection": "tedx_data",
-"ssl": "true",
-"ssl.domain_match": "false"}
+# ID incrementale
+window_spec = Window.orderBy("idtedx")  # Ordina per ID casuale già fatto
+classrooms_df = random_ids_df.withColumn("id_classroom", row_number().over(window_spec))
+
+classrooms_final = classrooms_df.select("id_classroom", col("idtedx").alias("assigned_tedx"))
+
+# =========================================================================
+# === FASE 6: SCRITTURA CLASSROOMS SU MONGODB ===
+
+write_classrooms_options = {
+    "connectionName": "Mongodbatlas connection TEDxSchool",
+    "database": "unibg_tedx_2025", 
+    "collection": "classrooms",
+    "ssl": "true",
+    "ssl.domain_match": "false"
+}
+
 from awsglue.dynamicframe import DynamicFrame
-tedx_dataset_dynamic_frame = DynamicFrame.fromDF(tedx_dataset_agg, glueContext, "nested")
+classrooms_dynamic_frame = DynamicFrame.fromDF(classrooms_final, glueContext, "classrooms")
+glueContext.write_dynamic_frame.from_options(classrooms_dynamic_frame, connection_type="mongodb", connection_options=write_classrooms_options)
 
-glueContext.write_dynamic_frame.from_options(tedx_dataset_dynamic_frame, connection_type="mongodb", connection_options=write_mongo_options)
+print("Classrooms scritte su MongoDB (unibg_tedx_2025.classrooms)")
 
 print("#### FINE PROCESSO ETL TEDX - Dati scritti su MongoDB Atlas ####")
 job.commit()
