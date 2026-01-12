@@ -3,7 +3,7 @@ class Constants {
 
   static const String CLASSROOM_NAME = '3A Liceo Classico';
 
-  static const String BACKEND_URL = 'http://192.168.0.52:3000';
+  static const String BACKEND_URL = 'http://192.168.0.52:3000';  //sostituire con il proprio ip locale, localhost a volte non funziona
 
   static const String AWS_API_assign =
       'https://rmzhxx8uz6.execute-api.us-east-1.amazonaws.com/prod';
@@ -18,5 +18,5 @@ class Constants {
       'https://hsbb6b8bri.execute-api.us-east-1.amazonaws.com/prod';
 
   static const String MONGO_URI =
-      'mongodb+srv://unibg2025:unibg2025@mycluster.mpofoqq.mongodb.net/unibg_tedx_2025?retryWrites=true&w=majority';
+      '';  //nascosto, salvato in locale
 }
